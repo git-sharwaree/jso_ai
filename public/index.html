@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JSO · HR Consultation Intelligence Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-inner">
+    <div class="logo">
+      <div class="logo-mark">J</div>
+      <div>
+        <div class="logo-text">JSO · AariyaTech</div>
+        <div class="logo-sub">Career Intelligence Platform</div>
+      </div>
+    </div>
+    <div class="badge">HR MONITORING AGENT v1.0</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>HR Consultation<br/><em>Intelligence Agent</em></h1>
+    <p>Analyse HR consultation transcripts in context of the candidate's JSO profile — evaluating tone, professionalism, engagement, bias, and whether known skill gaps were actually addressed.</p>
+  </div>
+
+  <!-- Part C: Workers + Governance — visible commitment upfront -->
+  <div class="ethics-banner">
+    <div class="icon">🛡️</div>
+    <div>
+      <strong>Ethical AI Commitment</strong>
+      <p>This agent is designed to <strong>support HR professionals</strong>, not surveil them. All analysis is non-punitive and used exclusively for coaching and quality improvement. No transcript data is stored beyond this session. Results are advisory only — human review is always required before any action is taken.</p>
+    </div>
+  </div>
+
+  <!-- ── SECTION 1: Session Metadata ── -->
+  <div class="input-section">
+    <div class="section-label">Session Metadata</div>
+    <div class="meta-row">
+      <input type="text" id="hrName" placeholder="HR Consultant Name (optional)" />
+      <input type="text" id="roleContext" placeholder="Role Being Discussed (e.g. Data Engineer)" />
+    </div>
+
+    <!-- ── SECTION 2: Candidate Profile ── -->
+    <!-- In production this is auto-fetched from Supabase via userId.    -->
+    <!-- Here it is filled in manually by the HR consultant to simulate  -->
+    <!-- the pre-session briefing data the agent would receive.          -->
+    <!-- Part C Sustainability: helps agent protect disadvantaged        -->
+    <!-- candidates by detecting when their profile was ignored.         -->
+    <div class="section-label" style="margin-top:18px;">
+      Candidate Profile
+      <span class="profile-note">Simulates data fetched from JSO · Supabase in production</span>
+    </div>
+    <div class="profile-grid">
+      <input type="text" id="atsScore"         placeholder="ATS Score (e.g. 72/100)" />
+      <input type="text" id="experienceLevel"  placeholder="Experience Level (e.g. Mid-level, 4 years)" />
+      <input type="text" id="targetRole"       placeholder="Target Role (e.g. ML Engineer)" />
+      <input type="text" id="skillGaps"        placeholder="Known Skill Gaps from JSO (e.g. DevOps, System Design)" />
+    </div>
+    <input type="text" id="background" placeholder="Background Summary (e.g. Python dev, transitioning to AI roles)" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-family:'Sora',sans-serif; font-size:13px; outline:none; margin-top:10px;" />
+    <input type="text" id="previousNotes" placeholder="Previous Consultation Notes (e.g. Needs to work on interview confidence)" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-family:'Sora',sans-serif; font-size:13px; outline:none; margin-top:8px;" />
+
+    <!-- ── SECTION 3: Transcript ── -->
+    <div class="section-label" style="margin-top:18px;">Consultation Transcript</div>
+    <textarea id="transcript" placeholder="Paste the HR consultation transcript here. Include speaker labels where possible:&#10;&#10;HR: Tell me about your experience with Python.&#10;Candidate: I have been working with Python for 3 years...&#10;&#10;The agent will cross-reference the transcript against the candidate profile above."></textarea>
+    <div class="scenario-row">
+      <select id="scenarioSelect" class="scenario-select">
+        <option value="bias">Scenario 1 — Bias &amp; Profile Mismatch (Mid-level)</option>
+        <option value="ghosted">Scenario 2 — Fresher Ghosted After Assignment</option>
+        <option value="interview">Scenario 3 — Struggling with STAR &amp; DSA Interviews</option>
+      </select>
+      <button class="sample-btn" id="sampleBtn">Load Scenario →</button>
+    </div>
+
+    <div class="run-row">
+      <button class="run-btn" id="runBtn">Analyse Consultation →</button>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Analysing consultation transcript…</p>
+    <div class="step" id="loadStep">Initialising ethical AI layer…</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <div class="section-label">Analysis Results</div>
+
+    <!-- Audit header — Governance (Part C) -->
+    <div class="audit-header">
+      <div>
+        <div class="audit-meta">Session ID: <span id="auditId">—</span></div>
+        <div class="audit-meta" style="margin-top:3px;">
+          Analysed: <span id="auditTime">—</span> ·
+          Model: <span>Gemini 1.5 Flash</span> ·
+          Profile: <span id="auditProfile">—</span>
+        </div>
+      </div>
+      <div id="verdictChip" class="verdict-chip">—</div>
+    </div>
+
+    <!-- Profile alignment panel — only meaningful when profile was provided -->
+    <!-- Part C Sustainability: shows whether candidate's known needs were met -->
+    <div class="alignment-panel" id="alignmentPanel">
+      <div class="panel-title"><span class="dot dot-accent"></span>Profile Alignment Check</div>
+      <div class="alignment-inner">
+        <div id="alignmentBadge" class="alignment-badge">—</div>
+        <p id="alignmentNotes" style="font-size:12.5px; color:var(--text); line-height:1.6;"></p>
+      </div>
+    </div>
+
+    <!-- Score grid -->
+    <div class="score-grid" id="scoreGrid"></div>
+
+    <!-- Strengths + Concerns -->
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-accent2"></span>Observed Strengths</div>
+        <div class="tag-list" id="strengthsList"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-danger"></span>Areas of Concern</div>
+        <div class="tag-list" id="concernsList"></div>
+      </div>
+    </div>
+
+    <!-- Bias Detection — Part C Community -->
+    <div class="bias-panel" id="biasPanel">
+      <div class="panel-title"><span class="dot dot-warn"></span>Bias & Fairness Scan</div>
+      <div id="biasList"></div>
+    </div>
+
+    <!-- Coaching Suggestions — Part C Workers -->
+    <div class="suggestions-panel">
+      <div class="panel-title"><span class="dot dot-accent"></span>Coaching Recommendations</div>
+      <div id="suggestionsList"></div>
+    </div>
+
+    <!-- Fallback Handling + Engagement — Part C Workers -->
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-accent"></span>Fallback Handling</div>
+        <div id="fallbackBadge" class="alignment-badge align-na" style="margin-bottom:10px;">—</div>
+        <p id="fallbackNotes" style="font-size:12.5px;color:var(--text);line-height:1.6;"></p>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-accent2"></span>Engagement Suggestions</div>
+        <ul class="flag-list" id="engagementList"></ul>
+      </div>
+    </div>
+
+    <!-- Conflict of Interest — Part C Governance -->
+    <div class="bias-panel" id="conflictPanel">
+      <div class="panel-title"><span class="dot dot-warn"></span>Conflict of Interest Signals</div>
+      <div id="conflictList"></div>
+    </div>
+
+    <!-- Candidate Experience + Summary -->
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-accent2"></span>Candidate Experience Notes</div>
+        <ul class="flag-list" id="candExpList"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot dot-accent"></span>Overall Summary</div>
+        <p id="summaryText"></p>
+      </div>
+    </div>
+
+    <!-- Transparency Audit Log — Governance (Part C) -->
+    <div class="section-label" style="margin-top:20px;">Transparency Audit Log</div>
+    <div class="audit-log" id="auditLog"></div>
+
+    <!-- Raw JSON toggle — shows structured output for evaluators -->
+    <button class="raw-toggle" id="rawToggle">{ } View Raw JSON Output</button>
+    <pre id="rawJson"></pre>
+
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    JSO · <span>AariyaTech Corp</span> · HR Consultation Intelligence Agent · Phase 2 Prototype · Gemini 1.5 Flash · Advisory use only
+  </div>
+</footer>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
