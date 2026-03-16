@@ -1,4 +1,4 @@
-// ── Simulated session history ────────────────────────────────────
+//simulated his
 const MOCK_SESSION_HISTORY = [
   {
     date: '2026-03-01',
@@ -14,8 +14,8 @@ const MOCK_SESSION_HISTORY = [
   }
 ];
 
-// ── Three demo scenarios ─────────────────────────────────────────
-// Each triggers different agent capabilities for demo purposes.
+//Three demo scenarios
+//Each triggers different agent capabilities for demo purposes.
 const SCENARIOS = [
   {
     id: 'bias',
@@ -147,7 +147,7 @@ const SCORE_LABELS = {
 
 const $ = id => document.getElementById(id);
 
-// ── Load scenario ────────────────────────────────────────────────
+//load scenario
 function loadScenario(id) {
   const s = SCENARIOS.find(x => x.id === id);
   if (!s) return;
@@ -175,7 +175,7 @@ $('rawToggle').addEventListener('click', () => {
   $('rawJson').classList.toggle('visible');
 });
 
-// ── Run analysis ──────────────────────────────────────────────────
+//run analysis
 $('runBtn').addEventListener('click', runAnalysis);
 
 async function runAnalysis() {
@@ -197,7 +197,7 @@ async function runAnalysis() {
   };
   const profileProvided = Object.values(candidateProfile).some(v => v);
 
-  // Use mock session history only if consultant name matches sample
+  // Use mock session history
   // In production: fetched from Supabase by consultant ID
   const consultantName = $('hrName').value.trim();
   const sessionHistory = consultantName ? MOCK_SESSION_HISTORY : [];
@@ -239,7 +239,6 @@ async function runAnalysis() {
   }
 }
 
-// ── Render ────────────────────────────────────────────────────────
 function renderResults(d) {
   $('loading').classList.remove('active');
   $('results').classList.add('active');
@@ -247,12 +246,12 @@ function renderResults(d) {
 
   const audit = d._audit || {};
 
-  // Audit header
+  
   $('auditId').textContent      = audit.sessionId || 'N/A';
   $('auditTime').textContent     = new Date(audit.analysedAt || Date.now()).toLocaleString();
   $('auditProfile').textContent  = audit.profileProvided ? 'Profile ✓' : 'No profile';
 
-  // Verdict
+  
   const vc = $('verdictChip');
   vc.textContent = d.overall_verdict || 'N/A';
   vc.className = 'verdict-chip ' + (
@@ -260,7 +259,7 @@ function renderResults(d) {
     d.overall_verdict === 'Poor' ? 'verdict-bad' : 'verdict-warn'
   );
 
-  // Profile alignment
+  //profile alignment
   const ap = $('alignmentPanel');
   const ab = $('alignmentBadge');
   const an = $('alignmentNotes');
@@ -279,12 +278,12 @@ function renderResults(d) {
     an.textContent = d.profile_alignment?.notes || '';
   }
 
-  // Recurring pattern badge
+  
   if (d.recurring_pattern && audit.historyProvided) {
     an.textContent += ' ⚠ Recurring pattern detected across previous sessions.';
   }
 
-  // Scores
+  //score
   const grid = $('scoreGrid');
   grid.innerHTML = '';
   Object.entries(d.scores || {}).forEach(([key, val]) => {
@@ -299,13 +298,13 @@ function renderResults(d) {
       </div>`;
   });
 
-  // Strengths + concerns
+  //Strengths&concerns
   $('strengthsList').innerHTML = (d.strengths || []).map(s =>
     `<span class="tag tag-positive">${s}</span>`).join('');
   $('concernsList').innerHTML  = (d.concerns  || []).map(c =>
     `<span class="tag tag-negative">${c}</span>`).join('');
 
-  // Bias panel
+  //Bias section
   const bp = $('biasPanel');
   const bl = $('biasList');
   if (d.bias_clean || !d.bias_flags?.length) {
@@ -329,7 +328,7 @@ function renderResults(d) {
       <div class="sug-priority pri-${s.priority==='High'?'high':s.priority==='Medium'?'med':'low'}">${s.priority}</div>
     </div>`).join('');
 
-  // Fallback handling panel
+  //Fallback handling
   const fb = d.fallback_handling || {};
   const fbBadge = $('fallbackBadge');
   const fbNotes = $('fallbackNotes');
@@ -345,11 +344,11 @@ function renderResults(d) {
   }
   fbNotes.textContent = fb.notes || 'No knowledge-gap moments detected in this session.';
 
-  // Engagement suggestions
+  //Engagement suggestions
   $('engagementList').innerHTML = (d.engagement_suggestions || []).map(s =>
     `<li><span style="margin-right:6px;color:var(--accent2)">→</span>${s}</li>`).join('');
 
-  // Conflict of interest panel
+  //Conflict of interest
   const cp  = $('conflictPanel');
   const cl  = $('conflictList');
   if (!d.conflict_signals || d.conflict_signals.length === 0) {
@@ -364,13 +363,13 @@ function renderResults(d) {
       </div>`).join('');
   }
 
-  // Candidate experience
+  //Candidate experience
   $('candExpList').innerHTML = (d.candidate_experience_notes || []).map(n =>
     `<li><span style="margin-right:6px;color:var(--accent)">→</span>${n}</li>`).join('');
 
   $('summaryText').textContent = d.overall_summary || '';
 
-  // Agent tool log — shows evaluators this is a real agent
+  //Agent tool log
   const agentLog = audit.agentLog || [];
   $('auditLog').innerHTML = agentLog.map(e => `
     <div class="log-entry">

@@ -11,12 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ════════════════════════════════════════════════════════════════
-//  AGENT TOOLS
-// ════════════════════════════════════════════════════════════════
 
-// ── TOOL 1: Profile Fetcher ──────────────────────────────────────
-// Production: SELECT * FROM candidate_profiles WHERE user_id = $1
+// TOOL 1: Profile Fetcher 
+// Production: Select from supabase
 // Prototype:  receives profile from form input
 function tool_fetchCandidateProfile(candidateProfile) {
   const hasProfile = candidateProfile &&
@@ -52,9 +49,7 @@ Flag in profile_alignment.notes if profile signals were IGNORED.`
   };
 }
 
-// ── TOOL 2: Session History Checker ─────────────────────────────
-// Production: SELECT * FROM consultation_audits
-//             WHERE consultant = $1 ORDER BY date DESC LIMIT 5
+// TOOL 2: Session History Checker
 // Prototype:  receives simulated history from client
 function tool_checkSessionHistory(consultantName, sessionHistory) {
   if (!sessionHistory || sessionHistory.length === 0) {
@@ -100,30 +95,25 @@ to High priority.`
   };
 }
 
-// ── TOOL 3: Fallback Detector ────────────────────────────────────
-// NEW: Scans transcript for moments where HR didn't know an answer.
-// Detects two cases:
-//   Case A — HR attempted a lookup (positive signal)
-//   Case B — HR gave an honest redirect (also positive, but needs coaching)
-//   Case C — HR deflected, gave vague answer, or went silent (concern)
-// Returns structured context that Gemini uses to evaluate fallback quality.
+//TOOL 3: Fallback Detector
+
 function tool_detectFallbackMoments(transcript) {
   const lines = transcript.toLowerCase();
 
-  // Phrases that suggest HR attempted to look something up
+  // Case A — HR attempted a lookup (positive signal)
   const lookupPhrases = [
     "let me check", "let me look", "i'll find out", "i can look that up",
     "i'll get back", "let me refer", "checking", "one moment"
   ];
 
-  // Phrases that suggest HR gave an honest redirect (good behaviour)
+  // Case B — HR gave an honest redirect (also positive, but needs coaching)
   const redirectPhrases = [
     "outside my", "not my area", "recommend speaking to",
     "better placed", "technical recruiter", "i don't specialise",
     "i'm not the best", "i'd suggest checking", "not sure about that"
   ];
 
-  // Phrases that suggest HR deflected without helping (concern)
+  // Case C — HR deflected, gave vague answer, or went silent (concern)
   const deflectPhrases = [
     "i don't know", "no idea", "can't say", "not sure",
     "don't have that information", "i'll have to skip that"
@@ -133,7 +123,7 @@ function tool_detectFallbackMoments(transcript) {
   const hasRedirect = redirectPhrases.some(p => lines.includes(p));
   const hasDeflect  = deflectPhrases.some(p  => lines.includes(p));
 
-  // Only flag deflection if there's no accompanying redirect
+  // flag detection
   const deflectWithoutRedirect = hasDeflect && !hasRedirect;
 
   let fallbackContext = '\nFALLBACK HANDLING DETECTED:\n';
@@ -169,16 +159,14 @@ This is critical for Part C Workers — agent must support HR, not punish knowle
   };
 }
 
-// ── TOOL 4: Conflict of Interest Detector ───────────────────────
-// Scans for signals that the HR may have a conflict of interest.
+// TOOL 4: Conflict of Interest Detector
 // Part C Governance: how conflicts of interest are handled.
-// These are signals only — not accusations. Flagged for human review.
 function tool_detectConflictSignals(transcript, roleContext) {
   const lines = transcript.toLowerCase();
 
   const signals = [];
 
-  // Signal 1: Session unusually short (word count proxy)
+  //1: Session unusually short
   const wordCount = transcript.split(/\s+/).length;
   if (wordCount < 150) {
     signals.push({
@@ -187,7 +175,7 @@ function tool_detectConflictSignals(transcript, roleContext) {
     });
   }
 
-  // Signal 2: HR pushing toward or away from a specific agency/company
+  //2: HR pushing toward or away from a specific agency/company
   const agencyPush = ['our agency', 'we can place you', 'i can refer you directly',
     'skip the platform', 'contact me directly', 'bypass'];
   if (agencyPush.some(p => lines.includes(p))) {
@@ -197,7 +185,7 @@ function tool_detectConflictSignals(transcript, roleContext) {
     });
   }
 
-  // Signal 3: Overly negative framing without evidence
+  //3: Overly negative framing without evidence
   const negativePatterns = ['you are not ready', 'probably not suitable',
     'unlikely to get', 'waste of time', 'overqualified for everything'];
   if (negativePatterns.some(p => lines.includes(p))) {
@@ -218,8 +206,8 @@ function tool_detectConflictSignals(transcript, roleContext) {
   };
 }
 
-// ── TOOL 5: Bias Validator ───────────────────────────────────────
-// Grounds every Gemini-generated bias flag to actual transcript text.
+//TOOL 5: Bias Validator
+// Grounds every generated bias flag to actual transcript text.
 // Removes hallucinated flags. Part C Community — fair, evidence-based.
 function tool_validateBiasFlags(biasFlags, transcript) {
   if (!biasFlags || biasFlags.length === 0) {
@@ -252,7 +240,7 @@ function tool_validateBiasFlags(biasFlags, transcript) {
   };
 }
 
-// ── TOOL 6: Output Schema Validator ─────────────────────────────
+//TOOL 6: Output Schema Validator
 // Ensures JSON is complete and internally consistent.
 // Catches score-bias contradictions before reaching the client.
 function tool_validateOutput(parsed) {
@@ -267,7 +255,7 @@ function tool_validateOutput(parsed) {
     }
   });
 
-  // Contradiction: high scores + bias flags
+  // Contradiction
   const avgScore = scoreKeys.reduce((a, k) =>
     a + (parsed.scores?.[k]?.value || 0), 0) / scoreKeys.length;
   if (avgScore > 80 && parsed.bias_flags?.length > 0) {
@@ -293,11 +281,8 @@ function tool_validateOutput(parsed) {
   return { parsed, issues };
 }
 
-// ════════════════════════════════════════════════════════════════
-//  ORCHESTRATOR
-//  Decides which tools to call, combines outputs, calls Gemini,
-//  then validates the response. This is the agent loop.
-// ════════════════════════════════════════════════════════════════
+
+//  ORCHESTRATOR/ agent loop
 async function orchestrate(transcript, consultantName, role, candidateProfile, sessionHistory, apiKey) {
 
   const agentLog = [];
@@ -307,12 +292,12 @@ async function orchestrate(transcript, consultantName, role, candidateProfile, s
 
   log('ORCHESTRATOR_START', 'Agent initialised — beginning tool selection and execution');
 
-  // ── Tool 1: Fetch candidate profile ──────────────────────────
+  //Tool 1: Fetch candidate profile
   log('TOOL_CALL', 'tool_fetchCandidateProfile — retrieving candidate context');
   const profileResult = tool_fetchCandidateProfile(candidateProfile);
   log('TOOL_RESULT', `Profile: ${profileResult.profileProvided ? 'loaded successfully' : 'not provided — transcript-only mode'}`);
 
-  // ── Tool 2: Check session history (conditional) ───────────────
+  //Tool 2: Check session history (conditional)
   let historyResult = { success: false, context: '', patterns: [], biasRecurring: false };
   if (consultantName !== 'Anonymous' && sessionHistory?.length > 0) {
     log('TOOL_CALL', 'tool_checkSessionHistory — scanning for recurring patterns');
@@ -322,17 +307,17 @@ async function orchestrate(transcript, consultantName, role, candidateProfile, s
     log('TOOL_SKIP', 'tool_checkSessionHistory — skipped: no consultant name or history provided');
   }
 
-  // ── Tool 3: Detect fallback moments ──────────────────────────
+  //Tool 3: Detect fallback moments
   log('TOOL_CALL', 'tool_detectFallbackMoments — scanning for knowledge gap handling');
   const fallbackResult = tool_detectFallbackMoments(transcript);
   log('TOOL_RESULT', `Fallback: lookup=${fallbackResult.hasLookup}, redirect=${fallbackResult.hasRedirect}, deflect=${fallbackResult.hasDeflect}`);
 
-  // ── Tool 4: Detect conflict of interest signals ───────────────
+  //Tool 4: Detect conflict of interest signals
   log('TOOL_CALL', 'tool_detectConflictSignals — scanning for conflict indicators');
   const conflictResult = tool_detectConflictSignals(transcript, role);
   log('TOOL_RESULT', `Conflict signals: ${conflictResult.hasSignals ? conflictResult.signals.map(s=>s.type).join(', ') : 'none detected'}`);
 
-  // ── Build enriched prompt from all tool outputs ───────────────
+  //Build enriched prompt from all tool outputs
   log('PROMPT_BUILD', 'Assembling enriched prompt from all tool outputs');
 
   const prompt = `You are an HR consultation quality analyst for JSO (Job Search Optimiser) by AariyaTech Corp.
@@ -409,9 +394,7 @@ ETHICAL GUIDELINES — follow strictly:
 9. Coaching suggestions: constructive, empathetic, growth-oriented — never punitive.
 10. Set bias_clean true only when bias_flags is empty.`;
 
-  // ── Call OpenRouter (bypasses regional free tier blocks) ────────
-  // OpenRouter proxies multiple models including Gemini — free tier,
-  // no regional restrictions, uses OpenAI-compatible message format.
+  
   log('LLM_CALL', 'Sending enriched prompt to OpenRouter → gemini-2.0-flash-exp');
 
   const geminiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -445,7 +428,7 @@ ETHICAL GUIDELINES — follow strictly:
   try { parsed = JSON.parse(raw); }
   catch (e) { throw new Error('Failed to parse Gemini JSON response. Please retry.'); }
 
-  // ── Tool 5: Validate bias flags ───────────────────────────────
+  //Tool 5: Validate bias flags
   log('TOOL_CALL', 'tool_validateBiasFlags — grounding flags to transcript evidence');
   const biasValidation = tool_validateBiasFlags(parsed.bias_flags, transcript);
   parsed.bias_flags = biasValidation.validated;
@@ -453,8 +436,8 @@ ETHICAL GUIDELINES — follow strictly:
     ? `Removed ${biasValidation.removed} hallucinated flag(s): ${biasValidation.hallucinated.join(', ')}`
     : `All ${biasValidation.validated.length} flag(s) grounded to transcript`);
 
-  // ── Merge conflict signals from Tool 4 into output ────────────
-  // Tool 4 ran rule-based detection — merge with Gemini's analysis
+  //Merge conflict signals from Tool 4 into output
+  // Tool 4 o/p with Gemini analysis
   if (conflictResult.hasSignals) {
     const existingTypes = (parsed.conflict_signals || []).map(s => s.type);
     conflictResult.signals.forEach(sig => {
@@ -466,7 +449,7 @@ ETHICAL GUIDELINES — follow strictly:
     log('TOOL_RESULT', `Conflict signals merged: ${conflictResult.signals.map(s=>s.type).join(', ')}`);
   }
 
-  // ── Tool 6: Validate output schema ───────────────────────────
+  //Tool 6: Validate output schema
   log('TOOL_CALL', 'tool_validateOutput — checking schema and score consistency');
   const validation = tool_validateOutput(parsed);
   parsed = validation.parsed;
@@ -474,7 +457,7 @@ ETHICAL GUIDELINES — follow strictly:
     ? `Issues corrected: ${validation.issues.join(' | ')}`
     : 'Schema valid — no contradictions detected');
 
-  // ── Attach audit metadata ─────────────────────────────────────
+  //metadata
   parsed._audit = {
     sessionId          : 'JSO-' + Date.now().toString(36).toUpperCase(),
     analysedAt         : new Date().toISOString(),
@@ -498,9 +481,8 @@ ETHICAL GUIDELINES — follow strictly:
   return parsed;
 }
 
-// ════════════════════════════════════════════════════════════════
-//  API ROUTES
-// ════════════════════════════════════════════════════════════════
+
+//API ROUTES
 
 app.get('/api/health', (req, res) => {
   res.json({
